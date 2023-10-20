@@ -40,7 +40,7 @@ class swift():
 		self.drone_position = [0.0,0.0,0.0]	
 
 		# [x_setpoint, y_setpoint, z_setpoint]
-		self.setpoint = [2,2,20] # whycon marker at the position of the dummy given in the scene. Make the whycon marker associated with position_to_hold dummy renderable and make changes accordingly
+		self.setpoint = [0,0,0] # whycon marker at the position of the dummy given in the scene. Make the whycon marker associated with position_to_hold dummy renderable and make changes accordingly
 
 
 		#Declaring a cmd of message type swift_msgs and initializing values
@@ -222,8 +222,6 @@ class swift():
 
 			for i in range(3):
 				self.prev_error[i] = self.error[i]
-
-
 		self.time_prev = self.time_now
 
 
@@ -250,9 +248,23 @@ class swift():
 
 
 if __name__ == '__main__':
-
+	itr=0
+	points=[[0, 0, 23],
+			[2, 0, 23],
+			[2, 2, 23],
+			[2, 2, 25],
+			[-5, 2, 25],
+			[-5, -3, 25],
+			[-5, -3, 21],
+			[7, -3, 21],
+			[7, 0, 21],
+			[0, 0, 19]]
 	swift_drone = swift()
 	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz
 	while not rospy.is_shutdown():
+		if max(list(map(abs,swift_drone.error)))<0.2:
+			if(itr<len(points)):
+				swift_drone.setpoint=points[itr]
+				itr+=1
 		swift_drone.pid()
 		r.sleep()

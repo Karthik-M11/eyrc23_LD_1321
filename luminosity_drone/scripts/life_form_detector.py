@@ -30,8 +30,77 @@ from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Image
 import cv2 # OpenCV library
 import rospy
 import time
-from led_detection import led_finder
+import imutils
+from imutils import contours
+from skimage import measure
+import numpy as np
 
+
+def led_finder(image):
+	# convert it to grayscale, and blur it
+	# image=cv2.rotate(image,cv2.ROTATE_180)
+	gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	blur_image = cv2.blur(gray_image, (11,11))
+	# threshold the image to reveal light regions in the blurred image
+	threshold_image = cv2.threshold(blur_image, 127, 255, cv2.THRESH_BINARY)[1]
+	# perform a series of erosions and dilations to remove any small blobs of noise from the thresholded image
+	threshold_image = cv2.erode(threshold_image, None, iterations=1)
+	threshold_image = cv2.dilate(threshold_image, None, iterations=1)
+	# perform a connected component analysis on the thresholded image, then initialize a mask to store only the "large" components
+	label_image = measure.label(threshold_image, background=0, connectivity=None)
+	mask = np.zeros(threshold_image.shape, dtype="uint8")
+	# loop over the unique components
+	for label in np.unique(label_image):
+			# if this is the background label, ignore it
+			if label == 0:
+				continue
+			# otherwise, construct the label mask and count the number of pixels
+			labelMask = np.zeros(threshold_image.shape, dtype="uint8")
+			labelMask = np.zeros(threshold_image.shape, dtype="uint8")
+			labelMask[label_image == label] = 255
+			numPixels = cv2.countNonZero(labelMask)
+		# if the number of pixels in the component is sufficiently large, then add it to our mask of "large blobs"
+			if numPixels > 200:
+				mask = cv2.add(mask, labelMask)
+	# find the contours in the mask, then sort them from left to right
+	contour = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+	contour = imutils.grab_contours(contour)
+	# print(contour)
+	if len(contour) == 0:
+			pass
+	else:
+		contour = contours.sort_contours(contour)[0]
+	# loop over the contours
+	# Initialize lists to store centroid coordinates and area
+	avg_centroid=[0,0]
+	Centroid = []
+	Area = []
+
+	# print(contour[0])
+	# Loop over the contours
+	for (i, c) in enumerate(contour):
+		# Calculate the area of the contour
+			area = cv2.contourArea(c) 
+
+		# Draw the bright spot on the image
+			(x, y, w, h) = cv2.boundingRect(c)
+			(cX, cY), radius = cv2.minEnclosingCircle(c)
+			cv2.circle(image, (int(cX), int(cY)), int(radius),(0, 0, 255), 2)
+			cv2.putText(image, "#{}".format(i + 1), (x, y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+
+			cx = (x+x+w)/2
+			cy = (y+y+h)/2
+
+		# Append centroid coordinates and area to the respective lists
+			Area.append(area)
+			Centroid.append((cx,cy))
+			avg_centroid[0]+=cx
+			avg_centroid[1]+=cy
+	avg_centroid=list(map(lambda x:x/len(avg_centroid),avg_centroid))
+	dimension=image.shape
+	avg_centroid[0]/=dimension[1]
+	avg_centroid[1]/=dimension[0]
+	return len(Area),avg_centroid
 
 class swift():
 	"""docstring for swift"""
@@ -45,8 +114,6 @@ class swift():
 
 		# [x_setpoint, y_setpoint, z_setpoint]
 		self.setpoint = [2,2,20] # whycon marker at the position of the dummy given in the scene. Make the whycon marker associated with position_to_hold dummy renderable and make changes accordingly
-
-
 		#Declaring a cmd of message type swift_msgs and initializing values
 		self.cmd = swift_msgs()
 		self.cmd.rcRoll = 1500
@@ -58,6 +125,7 @@ class swift():
 		self.cmd.rcAUX3 = 1500
 		self.cmd.rcAUX4 = 1500
 		self.current_frame=None
+		self.led_no=0
 
 		#initial setting of Kp, Kd and ki for [roll, pitch, throttle]. eg: self.Kp[2] corresponds to Kp value in throttle axis
 		#after tuning and computing corresponding PID parameters, change the parameters
@@ -119,15 +187,11 @@ class swift():
 		#------------------------------------------------------------------------------------------------------------
 
 		self.arm() # ARMING THE DRONE
-
-
 	# Disarming condition of the drone
 	def disarm(self):
 		self.cmd.rcAUX4 = 1100
 		self.command_pub.publish(self.cmd)
 		rospy.sleep(1)
-
-
 	# Arming condition of the drone : Best practise is to disarm and then arm the drone.
 	def arm(self):
 
@@ -140,9 +204,6 @@ class swift():
 		self.cmd.rcAUX4 = 1500
 		self.command_pub.publish(self.cmd)	# Publishing /drone_command
 		rospy.sleep(1)
-
-
-
 	# Whycon callback function
 	# The function gets executed each time when /whycon node publishes /whycon/poses 
 	def whycon_callback(self,msg):
@@ -152,18 +213,13 @@ class swift():
 		self.drone_position[1] = msg.poses[0].position.y
 		self.drone_position[2] = msg.poses[0].position.z
 		#---------------------------------------------------------------------------------------------------------------
-
-
-
 	# Callback function for /pid_tuning_altitude
 	# This function gets executed each time when /tune_pid publishes /pid_tuning_altitude
 	def altitude_set_pid(self,alt):
 		self.Kp[2] = alt.Kp * 0.06 # This is just for an example. You can change the ratio/fraction value accordingly
 		self.Ki[2] = alt.Ki * 0.00008
 		self.Kd[2] = alt.Kd * 0.3
-		
 	#----------------------------Define callback function like altitide_set_pid to tune pitch, roll--------------
-
 	def pitch_set_pid(self, pitch):
 		self.Kp[1] = pitch.Kp * 0.06
 		self.Ki[1] = pitch.Ki * 0.00008
@@ -173,8 +229,6 @@ class swift():
 		self.Kp[0] = roll.Kp * 0.06
 		self.Ki[0] = roll.Ki * 0.00008
 		self.Kd[0] = roll.Kd * 0.3
-
-	#----------------------------------------------------------------------------------------------------------------------
 
 	def pid(self):
 	#-----------------------------Write the PID algorithm here--------------------------------------------------------------
@@ -250,44 +304,63 @@ class swift():
 	
 	# Used to convert between ROS and OpenCV images
 		br = CvBridge()
-		
-		# Output debugging information to the terminal
-		# rospy.loginfo("receiving video frame")
-		
-		# Convert ROS Image message to OpenCV image
 		self.current_frame = br.imgmsg_to_cv2(data)
 
 	def detector(self):
-		# cv2.imshow("camera", self.current_frame)
-		# cv2.waitKey(1)
-		n=led_finder(self.current_frame)
-		print('led number',n)
+		self.led_no,avg_centroid=led_finder(self.current_frame)
+		self.centroid=list(map(lambda x,y:((x-0.5)*24/2.6)+y,avg_centroid,self.drone_position))
+		print(f'centroid	{self.centroid}')
 
-
-
-
+	
+	def landing(self):
+		self.setpoint=[11,11,37]
+		if max(list(map(abs,swift_drone.error)))<0.2:
+			self.disarm()
+	
 
 if __name__ == '__main__':
-	a = 14/4
+	a = 24/6
 	itr=0
-	points=[[0, 0, 20],
-			[a, 0, 20],
-			[a, a, 20],
-			[0, a, 20],
-			[-a, a, 20],
-			[-a, 0, 20],
-			[-a, -a, 20],
-			[0, -a, 20],
-			[a, -a, 20]]
+	max_error=1
+	points=[[0,0,25],
+			[a,0,25],
+			[2*a,0,25],
+			[2*a,a,25],
+			[2*a,2*a,25],
+			[a,2*a,25],
+			[a,a,25],
+			[0,a,25],
+			[0,2*a,25],
+			[-a,2*a,25],
+			[-2*a,2*a,25],
+			[-2*a,a,25],
+			[-a,a,25],
+			[-a,0,25],
+			[-2*a,0,25],
+			[-2*a,-a,25],
+			[-2*a,2*a,25],
+			[-a,-2*a,25],
+			[0,-2*a,25],
+			[a,-2*a,25],
+			[2*a,-2*a,25],
+			[2*a,-a,25],
+			[a,-a,25],
+			[0,-a,25],
+			[-a,-a,25],
+			]
 	swift_drone = swift()
 	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz
 	rospy.Subscriber('swift/camera_rgb/image_raw', Image, swift_drone.callback)
 	while not rospy.is_shutdown():
-		if max(list(map(abs,swift_drone.error)))<0.2:
+		if max(list(map(abs,swift_drone.error)))<max_error:
 			if(itr<len(points)):
 				if(itr!=0):
 					swift_drone.detector()
-				swift_drone.setpoint=points[itr]
-				itr+=1
+				if swift_drone.led_no==0:
+					swift_drone.setpoint=points[itr]
+					itr+=1
+				else:
+					swift_drone.setpoint=[swift_drone.centroid[0],swift_drone.centroid[1],25]
+					max_error=0.2
 		swift_drone.pid()
 		r.sleep()

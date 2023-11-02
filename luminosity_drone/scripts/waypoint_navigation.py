@@ -27,6 +27,7 @@ from std_msgs.msg import Float64
 from pid_tune.msg import PidTune
 import rospy
 import time
+from led_detection import led_finder
 
 
 class swift():

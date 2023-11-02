@@ -1,0 +1,38 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/karthik/eyantra_ws/devel/include/**",
+        "/home/karthik/catkin_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/karthik/catkin_ws/src/beginner_tutorials/include/**",
+        "/home/karthik/catkin_ws/src/cv_basics/include/**",
+        "/home/karthik/catkin_ws/src/gazebo_ros_pkgs/gazebo_plugins/include/**",
+        "/home/karthik/catkin_ws/src/gazebo_ros_pkgs/gazebo_ros/include/**",
+        "/home/karthik/catkin_ws/src/gazebo_ros_pkgs/gazebo_ros_control/include/**",
+        "/home/karthik/catkin_ws/src/imu_example/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/swift_simulator/mav_comm/mav_msgs/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/swift_simulator/mav_comm/mav_planning_msgs/include/**",
+        "/home/karthik/catkin_ws/src/robo23/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/swift_simulator/rotors_control/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/swift_simulator/rotors_gazebo/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/swift_simulator/rotors_gazebo_plugins/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/swift_simulator/rotors_swift_interface/include/**",
+        "/home/karthik/catkin_ws/src/test_robot_description/include/**",
+        "/home/karthik/catkin_ws/src/test_robot_gazebo/include/**",
+        "/home/karthik/eyantra_ws/src/luminosity_drone/whycon/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

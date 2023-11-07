@@ -351,7 +351,7 @@ if __name__ == '__main__':
 			location.organism_type=swift_drone.identify()
 			swift_drone.past_centroid.append(swift_drone.centroid)
 			location.whycon_x=swift_drone.centroid[0]
-			location.whycon_y=swift_drone.centroid[1] - 0.7
+			location.whycon_y=swift_drone.centroid[1]
 			location.whycon_z=swift_drone.centroid[2]
 			pub.publish(location)
 			swift_drone.num_led = 0

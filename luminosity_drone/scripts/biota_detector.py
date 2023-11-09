@@ -89,17 +89,10 @@ class swift():
 		self.centroid = None
 		self.current_frame = None
 
-		self.detected_led = 0
-		self.num_det_led = 0
-		self.past_centroid = []
-		self.past_cen_check = False
-		self.past_led = 0
-		self.prev_cen = [0,0,0]
-
+		self.cen_error_check = False
 		self.led_setpoint = [0.5, 0.5]
 		self.led_error = [0,0]
 		self.led_check = 0
-		self.det_led = []
 
 		# Hint : Add variables for storing previous errors in each axis, like self.prev_error = [0,0,0] where corresponds to [pitch, roll, throttle]		#		 Add variables for limiting the values like self.max_values = [2000,2000,2000] corresponding to [roll, pitch, throttle]
 		#													self.min_values = [1000,1000,1000] corresponding to [pitch, roll, throttle]
@@ -121,6 +114,7 @@ class swift():
 		self.pitchError = rospy.Publisher('/pitch_error', Float64, queue_size=1)
 		self.rollError = rospy.Publisher('/roll_error', Float64, queue_size=1)
 		self.zero = rospy.Publisher('/zero', Int16, queue_size=1) #This is for displaying zero on plotjuggler
+		self.astrobiolocation = rospy.Publisher('/astrobiolocation', Biolocation, queue_size=1)
 	#-----------------------------------------------------------------------------------------------------------
 
 
@@ -201,7 +195,6 @@ class swift():
 		# self.centroid=list(map(lambda x,y:((x-0.5)*24*0.17)+y,self.centroid,self.drone_position))
 		# self.centroid.append(30)
 		self.num_led = len(area)
-		print(self.num_led)
 		self.centroid = self.drone_position
 
 	def led_target(self, image):
@@ -318,15 +311,15 @@ class swift():
 if __name__ == '__main__':
 	itr = 0
 	step = 0
+	led_detected = 0
 	
 	with open(r'/home/karthik/eyantra_ws/src/luminosity_drone/luminosity_drone/scripts/setpoints.txt', 'r') as file:
 		content = file.read()
 	points = ast.literal_eval(content)
 
 	swift_drone = swift()
-	location= Biolocation()
-	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz
-	pub = rospy.Publisher('/astrobiolocation', Biolocation, queue_size=1)	
+	location = Biolocation()
+	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz	
 	while not rospy.is_shutdown():
 		if max(list(map(abs,swift_drone.error[0:2])))<0.4 and swift_drone.error[2] < 1 and swift_drone.setpoint in points and step != 1: #or swift_drone.setpoint == [10.2, 10.4, 37.5]:
 			if itr<len(points):
@@ -339,29 +332,28 @@ if __name__ == '__main__':
 		if swift_drone.num_led > 0 and swift_drone.led_error != [0,0]:
 			step = 1
 			print([abs(i) for i in swift_drone.led_error])
-			if max([abs(i) for i in swift_drone.led_error]) < 0.03:
-				swift_drone.past_cen_check = True
+			if max([abs(i) for i in swift_drone.led_error]) < 0.02:
+				swift_drone.cen_error_check = True
 				swift_drone.led_detector(swift_drone.current_frame)
-				swift_drone.det_led.append(swift_drone.num_led)
 				if swift_drone.led_check == 0:
 					swift_drone.num_led = 0
 					swift_drone.setpoint = points[itr]			
 
-		if swift_drone.past_cen_check == True: #and swift_drone.num_led not in swift_drone.det_led:
+		if swift_drone.cen_error_check == True:
 			location.organism_type=swift_drone.identify()
-			swift_drone.past_centroid.append(swift_drone.centroid)
 			location.whycon_x=swift_drone.centroid[0]
 			location.whycon_y=swift_drone.centroid[1]
 			location.whycon_z=swift_drone.centroid[2]
-			pub.publish(location)
+			swift_drone.astrobiolocation.publish(location)
 			swift_drone.num_led = 0
 			swift_drone.setpoint = points[itr]
 			swift_drone.integral_error = [0,0,0]
 			step = 0
-			swift_drone.past_cen_check = False
+			swift_drone.cen_error_check = False
 			swift_drone.led_error = [0,0]
+			led_detected += 1
 
-		if itr == len(points) or len(swift_drone.past_centroid) == 3:
+		if itr == len(points) or led_detected == 3:
 			swift_drone.setpoint = [10.2, 10.4, 37.5]
 			swift_drone.Kp = [12, 20, 28.8]
 			swift_drone.integral_error = [0,0,0]

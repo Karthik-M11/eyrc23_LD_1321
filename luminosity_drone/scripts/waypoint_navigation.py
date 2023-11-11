@@ -36,7 +36,6 @@ from std_msgs.msg import Float64
 from pid_tune.msg import PidTune
 import rospy
 import time
-import ast
 
 
 class swift():
@@ -259,19 +258,16 @@ class swift():
 
 if __name__ == '__main__':
 	itr=0
-	# points=[[0, 0, 23],
-	# 		[2, 0, 23],
-	# 		[2, 2, 23],
-	# 		[2, 2, 25],
-	# 		[-5, 2, 25],
-	# 		[-5, -3, 25],
-	# 		[-5, -3, 21],
-	# 		[7, -3, 21],
-	# 		[7, 0, 21],
-	# 		[0, 0, 19]]
-	with open(r'/home/karthik/eyantra_ws/src/luminosity_drone/luminosity_drone/scripts/setpoints.txt', 'r') as file:
-		content = file.read()
-	points = ast.literal_eval(content)
+	points=[[0, 0, 23],
+			[2, 0, 23],
+			[2, 2, 23],
+			[2, 2, 25],
+			[-5, 2, 25],
+			[-5, -3, 25],
+			[-5, -3, 21],
+			[7, -3, 21],
+			[7, 0, 21],
+			[0, 0, 19]]
 
 	swift_drone = swift()
 	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz

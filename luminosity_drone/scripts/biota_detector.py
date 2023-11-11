@@ -400,7 +400,6 @@ if __name__ == '__main__':
 		# Aligns the centre of drone camera frame with the centroid of the LEDs within the acceptable tolerance.
 		if swift_drone.num_led > 0 and swift_drone.led_error != [0,0]:
 			step = 1
-			print([abs(i) for i in swift_drone.led_error])
 			if max([abs(i) for i in swift_drone.led_error]) < 0.02:
 				swift_drone.cen_error_check = True
 				swift_drone.led_detector(swift_drone.current_frame)

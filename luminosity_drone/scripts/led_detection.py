@@ -2,7 +2,7 @@
 # Team ID:           1321
 # Theme:             Luminosity Drone
 # Author List:       M Krishnaprasad Varma, Karthik Manoranjan, Madhav Menon, Sneha Joe M
-# Filename:          biota_detector.py
+# Filename:          led_detection.py
 # Functions:         led_finder
 # Global variables:  None
 '''

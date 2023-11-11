@@ -4,7 +4,7 @@
 # Team ID:           1321
 # Theme:             Luminosity Drone
 # Author List:       M Krishnaprasad Varma, Karthik Manoranjan, Madhav Menon, Sneha Joe M
-# Filename:          biota_detector.py
+# Filename:          position_hold.py
 # Functions:         __init__ , disarm , arm , whycon_callback , altitude_set_pid , pitch_set_pid , roll_set_pid , pid
 # Global variables:  None
 '''

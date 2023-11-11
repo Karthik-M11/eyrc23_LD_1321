@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 
 '''
+# Team ID:           1321
+# Theme:             Luminosity Drone
+# Author List:       M Krishnaprasad Varma, Karthik Manoranjan, Madhav Menon, Sneha Joe M
+# Filename:          biota_detector.py
+# Functions:         __init__ , disarm , arm , whycon_callback , altitude_set_pid , pitch_set_pid , roll_set_pid , pid
+# Global variables:  None
+'''
+
+'''
 
 This python file runs a ROS-node of name drone_control which holds the position of Swift-Drone on the given dummy.
 This node publishes and subsribes the following topics:
@@ -27,7 +36,7 @@ from std_msgs.msg import Float64
 from pid_tune.msg import PidTune
 import rospy
 import time
-from led_detection import led_finder
+import ast
 
 
 class swift():
@@ -59,7 +68,7 @@ class swift():
 		#initial setting of Kp, Kd and ki for [roll, pitch, throttle]. eg: self.Kp[2] corresponds to Kp value in throttle axis
 		#after tuning and computing corresponding PID parameters, change the parameters
 
-		self.Kp = [12, 24.5, 28.8] #[22.5, 22.5, 28.8]   #[22.5, 0, 40.8]
+		self.Kp = [18, 30, 28.8] #[22.5, 22.5, 28.8]   #[22.5, 0, 40.8]
 		self.Ki = [0, 0, -0.01] #[0, 0, 0.174]   #[0, 0, 0.18575]
 		self.Kd = [325.5, 325.5, 710] #[325.5, 325.5, 597.5]   #[325.5, 0, 750]
    
@@ -250,22 +259,31 @@ class swift():
 
 if __name__ == '__main__':
 	itr=0
-	points=[[0, 0, 23],
-			[2, 0, 23],
-			[2, 2, 23],
-			[2, 2, 25],
-			[-5, 2, 25],
-			[-5, -3, 25],
-			[-5, -3, 21],
-			[7, -3, 21],
-			[7, 0, 21],
-			[0, 0, 19]]
+	# points=[[0, 0, 23],
+	# 		[2, 0, 23],
+	# 		[2, 2, 23],
+	# 		[2, 2, 25],
+	# 		[-5, 2, 25],
+	# 		[-5, -3, 25],
+	# 		[-5, -3, 21],
+	# 		[7, -3, 21],
+	# 		[7, 0, 21],
+	# 		[0, 0, 19]]
+	with open(r'/home/karthik/eyantra_ws/src/luminosity_drone/luminosity_drone/scripts/setpoints.txt', 'r') as file:
+		content = file.read()
+	points = ast.literal_eval(content)
+
 	swift_drone = swift()
 	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz
 	while not rospy.is_shutdown():
-		if max(list(map(abs,swift_drone.error)))<0.2:
+		# print(f"error {swift_drone.drone_position} setpoint {swift_drone.setpoint}")
+		# print(f'start{itr}')
+		if max(list(map(abs,swift_drone.error)))<1:
 			if(itr<len(points)):
 				swift_drone.setpoint=points[itr]
+				swift_drone.integral_error = [0, 0, 0]
+				print(swift_drone.setpoint)
 				itr+=1
 		swift_drone.pid()
+		# print(f'end{itr}')
 		r.sleep()

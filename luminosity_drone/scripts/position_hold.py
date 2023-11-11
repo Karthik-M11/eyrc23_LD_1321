@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 
 '''
+# Team ID:           1321
+# Theme:             Luminosity Drone
+# Author List:       M Krishnaprasad Varma, Karthik Manoranjan, Madhav Menon, Sneha Joe M
+# Filename:          biota_detector.py
+# Functions:         __init__ , disarm , arm , whycon_callback , altitude_set_pid , pitch_set_pid , roll_set_pid , pid
+# Global variables:  None
+'''
+
+'''
 
 This python file runs a ROS-node of name drone_control which holds the position of Swift-Drone on the given dummy.
 This node publishes and subsribes the following topics:
@@ -40,7 +49,7 @@ class swift():
 		self.drone_position = [0.0,0.0,0.0]	
 
 		# [x_setpoint, y_setpoint, z_setpoint]
-		self.setpoint = [0, 0, 25] # whycon marker at the position of the dummy given in the scene. Make the whycon marker associated with position_to_hold dummy renderable and make changes accordingly
+		self.setpoint = [-8.771, 8.117, 29.451] # whycon marker at the position of the dummy given in the scene. Make the whycon marker associated with position_to_hold dummy renderable and make changes accordingly
 
 
 		#Declaring a cmd of message type swift_msgs and initializing values
@@ -58,7 +67,7 @@ class swift():
 		#initial setting of Kp, Kd and ki for [roll, pitch, throttle]. eg: self.Kp[2] corresponds to Kp value in throttle axis
 		#after tuning and computing corresponding PID parameters, change the parameters
 
-		self.Kp = [12, 24.5, 28.8] #[22.5, 22.5, 28.8]   #[22.5, 0, 40.8]
+		self.Kp = [18, 24.5, 28.8] #[22.5, 22.5, 28.8]   #[22.5, 0, 40.8] #12 = Kp
 		self.Ki = [0, 0, -0.01] #[0, 0, 0.174]   #[0, 0, 0.18575]
 		self.Kd = [325.5, 325.5, 710] #[325.5, 325.5, 597.5]   #[325.5, 0, 750]
    

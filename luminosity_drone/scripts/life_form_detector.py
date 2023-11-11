@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 
 '''
+# Team ID:           1321
+# Theme:             Luminosity Drone
+# Author List:       M Krishnaprasad Varma, Karthik Manoranjan, Madhav Menon, Sneha Joe M
+# Filename:          biota_detector.py
+# Functions:         __init__ , disarm , arm , whycon_callback , altitude_set_pid , pitch_set_pid , roll_set_pid , led_detector , led_finder , opencv_callback , identify , pid
+# Global variables:  None
+'''
+
+'''
 
 This python file runs a ROS-node of name drone_control which holds the position of Swift-Drone on the given dummy.
 This node publishes and subsribes the following topics:
@@ -322,9 +331,9 @@ class swift():
 
 
 if __name__ == '__main__':
-	a = 4
-	itr = 0
-	step=0
+	a = 4                     # Change the value to vary the setpoints.
+	itr = 0                    
+	step=0                    
 	points=[[0,0,25],
 			[a,0,25],
 			[2*a,0,25],
@@ -366,6 +375,7 @@ if __name__ == '__main__':
 				swift_drone.integral_error = [0, 0, 0]
 				itr+=1
 			else:
+				# Aligns centre of drone camera frame and centroid of LEDs and publishes to /astrobiolocation
 				if(step==0):
 					swift_drone.setpoint = swift_drone.centroid
 					swift_drone.integral_error = [0, 0, 0]
@@ -378,14 +388,17 @@ if __name__ == '__main__':
 					location.whycon_z=swift_drone.setpoint[2]
 
 					pub.publish(location)
+
+				# Drone moves to landing position
 				elif(step==1):
 					swift_drone.setpoint=[10.2, 10.4, 37.5]
 					swift_drone.integral_error = [0, 0, 0]
 					print(swift_drone.setpoint)
 					step=2
 					print('To landing')
+
+				# Drone is disarmed at research station
 				elif step == 2:
-					# if max(map(lambda x, y: abs(x - y), swift_drone.drone_position, [11, 11, 37.5])) < 0.2:
 					if abs(swift_drone.drone_position[0] - 11) < 0.1 and abs(swift_drone.drone_position[1] - 11) < 0.1:
 						swift_drone.disarm()
 						print('Disarming')

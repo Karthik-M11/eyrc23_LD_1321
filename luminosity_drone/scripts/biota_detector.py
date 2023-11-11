@@ -125,7 +125,7 @@ class swift():
 		
 		rospy.Subscriber('/pid_tuning_pitch', PidTune, self.pitch_set_pid)
 		rospy.Subscriber('/pid_tuning_roll', PidTune, self.roll_set_pid)
-		rospy.Subscriber('/swift/camera_rgb/image_raw', Image, self.callback)
+		rospy.Subscriber('/swift/camera_rgb/image_raw', Image, self.opencv_callback)
 		
 		#------------------------------------------------------------------------------------------------------------
 
@@ -188,16 +188,50 @@ class swift():
 		self.Ki[0] = roll.Ki * 0.00008
 		self.Kd[0] = roll.Kd * 0.3
 
+
 	def led_detector(self, image):
-		'''Function to detect the led'''
+		'''
+		Purpose:
+		---
+		To detect the number of LEDs present in the input frame and updates the centroid value with the drone position when called.
+
+		Input Arguments:
+		---
+		`image` :  [ ndarray ]
+			The image to be analysed.
+
+		Returns:
+		---
+		None
+
+		Example call:
+		---
+		led_detector(image)
+		'''
 		area, centroid = led_finder(image)
-		# print(self.centroid, self.drone_position)
-		# self.centroid=list(map(lambda x,y:((x-0.5)*24*0.17)+y,self.centroid,self.drone_position))
-		# self.centroid.append(30)
 		self.num_led = len(area)
 		self.centroid = self.drone_position
 
+
 	def led_target(self, image):
+		'''
+		Purpose:
+		---
+		To identify the normalised centroid of the LEDs and align the centre of drone camera output and the LED centroid by a proportional controller.
+
+		Input Arguments:
+		---
+		`image` :  [ ndarray ]
+			The image to be analysed.
+
+		Returns:
+		---
+		None
+
+		Example call:
+		---
+		led_target(image)
+		'''
 		area, target = led_finder(image)
 		self.led_error[0] = target[0] - self.led_setpoint[0]
 		self.led_error[1] = target[1] - self.led_setpoint[1]
@@ -208,12 +242,34 @@ class swift():
 		self.led_check = len(area)
 
 
-	def callback(self, data):
+	# OpenCV callback function.
+	# Executes every time data is published to /swift/camera_rgb/image_raw 
+	def opencv_callback(self, data):
+		# Used to convert between ROS and OpenCV images
 		br = CvBridge()
+		# Convert ROS Image message to OpenCV image
 		self.current_frame = br.imgmsg_to_cv2(data)
 
+
 	def identify(self):
-		'''Function to identify the type of organism'''
+		'''
+		Purpose:
+		---
+		To identify the type of organism based on the number of LEDs detected.
+
+		Input Arguments:
+		---
+		None
+
+		Returns:
+		---
+		`org_type` :  [ string ]
+    		Type of organism.
+
+		Example call:
+		---
+		identify()
+		'''
 		if self.num_led == 2:
 			org_type = "alien_a"
 		elif self.num_led == 3:
@@ -313,6 +369,7 @@ if __name__ == '__main__':
 	step = 0
 	led_detected = 0
 	
+	# Update the path with the path to setpoints.txt
 	with open(r'/home/karthik/eyantra_ws/src/luminosity_drone/luminosity_drone/scripts/setpoints.txt', 'r') as file:
 		content = file.read()
 	points = ast.literal_eval(content)
@@ -321,7 +378,8 @@ if __name__ == '__main__':
 	location = Biolocation()
 	r = rospy.Rate(30) #specify rate in Hz based upon your desired PID sampling time, i.e. if desired sample time is 33ms specify rate as 30Hz	
 	while not rospy.is_shutdown():
-		if max(list(map(abs,swift_drone.error[0:2])))<0.4 and swift_drone.error[2] < 1 and swift_drone.setpoint in points and step != 1: #or swift_drone.setpoint == [10.2, 10.4, 37.5]:
+		# Checks if drone position is within applicable limits when the setpoint is present in the list of points.
+		if max(list(map(abs,swift_drone.error[0:2])))<0.4 and swift_drone.error[2] < 1 and swift_drone.setpoint in points and step != 1:
 			if itr<len(points):
 				if itr!=0:
 					swift_drone.led_detector(swift_drone.current_frame)
@@ -329,6 +387,7 @@ if __name__ == '__main__':
 				swift_drone.integral_error = [0, 0, 0]
 				itr+=1
 
+		# Aligns the centre of drone camera frame with the centroid of the LEDs within the acceptable tolerance.
 		if swift_drone.num_led > 0 and swift_drone.led_error != [0,0]:
 			step = 1
 			print([abs(i) for i in swift_drone.led_error])
@@ -339,6 +398,7 @@ if __name__ == '__main__':
 					swift_drone.num_led = 0
 					swift_drone.setpoint = points[itr]			
 
+		# Publishes to /astrobiolocation
 		if swift_drone.cen_error_check == True:
 			location.organism_type=swift_drone.identify()
 			location.whycon_x=swift_drone.centroid[0]
@@ -353,6 +413,7 @@ if __name__ == '__main__':
 			swift_drone.led_error = [0,0]
 			led_detected += 1
 
+		# Drone goes to landing if either the drone covers all setpoints or 3 organisms are detected.
 		if itr == len(points) or led_detected == 3:
 			swift_drone.setpoint = [10.2, 10.4, 37.5]
 			swift_drone.Kp = [12, 20, 28.8]

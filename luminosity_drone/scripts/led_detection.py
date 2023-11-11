@@ -7,7 +7,30 @@ import cv2
 
 
 def led_finder(image):
+    '''
+    Purpose:
+    ---
+    To detect the LEDs present in the input frame and calculates the area of the individual LEDs present and the average normalised centroid of the LEDs.
+
+    Input Arguments:
+    ---
+    `image` :  [ ndarray ]
+        The image to be analysed.
+
+    Returns:
+    ---
+    `Area` :  [ list ]
+        list of areas of each detected LED.
+    `Centroid` :  [ list ]
+        Normalised average centroid of the LEDs.
+
+    Example call:
+    ---
+    led_finder(image)
+    '''
     dimension = image.shape
+    # image = image[50:450, 50:450]
+    # print(dimension)
     
     # image = cv2.imread('led.jpg', 1)
     # convert it to grayscale, and blur it
@@ -71,16 +94,16 @@ def led_finder(image):
         avg_x = centroid_x/len(Area)
         avg_y = centroid_y/len(Area)
 
-        avg_x /= dimension[0]
-        avg_y /= dimension[1]
+        avg_x /= dimension[1]
+        avg_y /= dimension[0]
 
         return Area, [avg_x, avg_y]
 
 
-# image  = cv2.imread('led.jpg', 1)
+# image  = cv2.imread(r'Screenshot from 2023-11-04 15-06-57.png', 1)
 
 # Area, Centroid = led_finder(image)
-
+# print(Area)
 # Save the output image as a PNG file
 # cv2.imwrite("LD_1321_led_detection_results.png", image)
 # # Open a text file for writing

@@ -119,7 +119,7 @@ class swift():
 		
 		rospy.Subscriber('/pid_tuning_pitch', PidTune, self.pitch_set_pid)
 		rospy.Subscriber('/pid_tuning_roll', PidTune, self.roll_set_pid)
-		rospy.Subscriber('/swift/camera_rgb/image_raw', Image, self.callback)
+		rospy.Subscriber('/swift/camera_rgb/image_raw', Image, self.opencv_callback)
 		
 		#------------------------------------------------------------------------------------------------------------
 
@@ -182,20 +182,59 @@ class swift():
 		self.Ki[0] = roll.Ki * 0.00008
 		self.Kd[0] = roll.Kd * 0.3
 
+
 	def led_detector(self, image):
-		'''Function to detect the led'''
+		'''
+		Purpose:
+		---
+		To detect the number of LEDs present in the input frame and converts the normalised centroid to whycon coordinates.
+
+		Input Arguments:
+		---
+		`image` :  [ ndarray ]
+			The image to be analysed.
+
+		Returns:
+		---
+		None
+
+		Example call:
+		---
+		led_detector(image)
+		'''
 		area, self.centroid = led_finder(image)
 		self.centroid=list(map(lambda x,y:((x-0.5)*24*0.17)+y,self.centroid,self.drone_position))
 		self.centroid.append(25)
 		self.num_led = len(area)
-		print(self.num_led)
 
-	def callback(self, data):
+
+	# OpenCV callback function.
+	# Executes every time data is published to /swift/camera_rgb/image_raw 
+	def opencv_callback(self, data):
+		# Used to convert between ROS and OpenCV images
 		br = CvBridge()
+		# Convert ROS Image message to OpenCV image
 		self.current_frame = br.imgmsg_to_cv2(data)
 
 	def identify(self):
-		'''Function to identify the type of organism'''
+		'''
+		Purpose:
+		---
+		To identify the type of organism based on the number of LEDs detected.
+
+		Input Arguments:
+		---
+		None
+
+		Returns:
+		---
+		`org_type` :  [ string ]
+    		Type of organism.
+
+		Example call:
+		---
+		identify()
+		'''
 		if self.num_led == 2:
 			org_type = "alien_a"
 		elif self.num_led == 3:

@@ -253,7 +253,7 @@ class swift():
 
 
 	# OpenCV callback function.
-	# Executes every time data is published to /swift/camera_rgb/image_raw 
+	# Executes every time image data is published to /swift/camera_rgb/image_raw 
 	def opencv_callback(self, data):
 		# Used to convert between ROS and OpenCV images
 		br = CvBridge()

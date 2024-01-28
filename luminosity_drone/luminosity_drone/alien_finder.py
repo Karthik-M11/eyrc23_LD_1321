@@ -18,7 +18,13 @@ from geometry_msgs.msg import PoseArray
 from pid_msg.msg import PidTune
 from swift_msgs.msg import PIDError, RCMessage
 from swift_msgs.srv import CommandBool
-
+from loc_msg.msg import Biolocation
+from led_detection import *
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
+import cv2 # OpenCV library
+import asyncio
+import json
 
 
 MIN_ROLL = 1250
@@ -36,9 +42,10 @@ BASE_THROTTLE = 1470
 MIN_THROTTLE = 1000
 SUM_ERROR_THROTTLE_LIMIT = 20000
 
-Start=0
-
 DRONE_WHYCON_POSE = [[], [], []]
+
+file = open('arena_mapper.json')
+data = json.load(file)
 
 # Similarly, create upper and lower limits, base value, and max sum error values for roll and pitch
 
@@ -74,6 +81,30 @@ class DroneController():
         self.Ki = [ 90 * 0.0002  , 54 * 0.0002  , 350 * 0.0001  ] #300
         self.Kd = [ 1050 * 0.1  , 1050 * 0.1  , 1538 * 0.1  ] #1538 #1750
 
+        # Define variables to find number of led
+        self.num_org = 0
+        self.led_setpoint = [240, 320]
+        self.led_error = [0, 0]
+
+        # Variable to store current frame
+        self.current_frame = cv2.imread("empty.png",1)
+
+        self.led_roll = 0
+        self.led_pitch = 0
+
+        self.type_list = None
+        self.cen_list = None
+        self.centroid = None
+        self.num_led = 0
+
+        # self.itr99=0
+        # self.prev99=0
+
+        self.execution_time = 0
+
+        # Bool to check if led has been identified in given video frame
+        self.led_identified = False
+
         # Create subscriber for WhyCon 
         
         self.whycon_sub = node.create_subscription(PoseArray,"/whycon/poses",self.whycon_poses_callback,1)
@@ -81,8 +112,11 @@ class DroneController():
         # Similarly create subscribers for pid_tuning_altitude, pid_tuning_roll, pid_tuning_pitch and any other subscriber if required
        
         self.pid_alt = node.create_subscription(PidTune,"/pid_tuning_altitude",self.pid_tune_throttle_callback,1)
-        self.pid_roll = node.create_subscription(PidTune, "/pid_tuning_roll", self.pid_tune_roll_callback,1)
-        self.pid_pitch = node.create_subscription(PidTune,"/pid_tuning_pitch",self.pid_tune_pitch_callback,1)
+        self.pid_roll = node.create_subscription(PidTune, "/pid_tuning_pitch", self.pid_tune_roll_callback,1)
+        self.pid_pitch = node.create_subscription(PidTune,"/pid_tuning_altitude",self.pid_tune_pitch_callback,1)
+
+        # Subscriber for drone camera
+        self.camera_sub = node.create_subscription(Image, "/video_frames", self.opencv_callback, 1)
 
         # Create publisher for sending commands to drone 
 
@@ -90,19 +124,20 @@ class DroneController():
 
         # Create publisher for publishing errors for plotting in plotjuggler 
         
-        self.pid_error_pub = node.create_publisher(PIDError, "/luminosity_drone/pid_error",1)        
+        self.pid_error_pub = node.create_publisher(PIDError, "/luminosity_drone/pid_error",1) 
+
+        # Publisher to pubslish to astrobiolocation
+        self.astrobiolocation = node.create_publisher(Biolocation, "/astrobiolocation", 1)
+
+        # Timer to execute when the buzzer and led needs to be powered.
+        self.on_bled = node.create_timer(0.2, self.on_callback)
+        self.off_bled = node.create_timer(0.2, self.off_callback) 
 
 
     def whycon_poses_callback(self, msg):
         self.drone_position[0] = msg.poses[0].position.x
         self.drone_position[1] = msg.poses[0].position.y
         self.drone_position[2] = msg.poses[0].position.z
-
-        self.drone_orientation[0] = msg.poses[0].orientation.w
-        self.drone_orientation[1] = msg.poses[0].orientation.x
-        self.drone_orientation[2] = msg.poses[0].orientation.y
-        self.drone_orientation[3] = msg.poses[0].orientation.z
-        # print(self.drone_position[0])
         if(self.drone_position[0] != 1000):
             self.last_whycon_pose_received_at = self.node.get_clock().now().seconds_nanoseconds()[0]
 
@@ -126,6 +161,74 @@ class DroneController():
         self.Kd[1] = msg.kd * 0.1
 
 
+    def opencv_callback(self, data):
+		# Used to convert between ROS and OpenCV images
+        br = CvBridge()
+		# Convert ROS Image message to OpenCV image
+        self.current_frame = br.imgmsg_to_cv2(data)
+        cv2.imshow('vaaliban',self.current_frame)
+        cv2.waitKey(1)
+
+    def led_detector(self, image):
+        self.type_list, self.cen_list, self.num_led = led_finder(image)
+        self.led_identified = len(self.type_list) > 0
+        self.centroid = self.drone_position
+        # self.num_led = len(self.cen_list)
+        print('Led_num',self.num_led)
+        # asyncio.run(self.b_led())
+
+
+    def on_callback(self):
+        #for buzzzer aux3, for led aux4
+        if self.execution_time%2 == 0 and self.execution_time != 0:
+            # print('on',self.execution_time)
+            self.rc_message.aux3 = 2000
+            self.rc_message.aux4 = 1500
+            self.execution_time -= 1
+
+    def off_callback(self):
+        if self.execution_time%2 == 1:
+            # print('off',self.execution_time)
+            self.rc_message.aux3 = 1000
+            self.rc_message.aux4 = 2000
+            self.execution_time -= 1
+
+    # def b_led(self):
+    #         self.itr99=0
+    #         self.prev99=time.time()
+    #         if((time.time()-self.prev99)>0.2):
+    #             self.prev99=time.time()
+    #             if(self.itr99%2==0):
+    #                 self.rc_message.aux3 = 2000
+    #                 self.rc_message.aux4 = 1500
+    #                 self.rc_pub.publish(self.rc_message)
+    #             else:
+    #                 self.rc_message.aux3 = 1000
+    #                 self.rc_message.aux4 = 2000
+    #                 self.rc_pub.publish(self.rc_message)
+    #             self.itr99 += 1
+
+    # async def b_led(self):
+    #     for i in range(self.num_led):
+    #         self.rc_message.aux3 = 2000
+    #         self.rc_message.aux4 = 1500
+    #         self.rc_pub.publish(self.rc_message)
+    #         await asyncio.sleep(1)
+    #         self.rc_message.aux3 = 1000
+    #         self.rc_message.aux4 = 2000
+    #         self.rc_pub.publish(self.rc_message)
+    #         await asyncio.sleep(1)
+    
+    def led_target(self, image):
+        self.type_list, cen_list, bye = led_finder(image)
+        # print(cen_list)
+        if(len(cen_list)!=0):
+            self.led_error[0] = cen_list[0][0] - self.led_setpoint[0]
+            self.led_error[1] = cen_list[0][1] - self.led_setpoint[1]
+            self.led_roll = BASE_ROLL + round(0.1*self.led_error[0])
+            self.led_pitch = BASE_PITCH - round(0.1*self.led_error[1])	
+
+
     def pid(self):          # PID algorithm
         # print('in pid')
         # 0 : calculating Error, Derivative, Integral for Roll error : x axis
@@ -134,7 +237,6 @@ class DroneController():
         # Similarly calculate error for y and z axes 
             self.error[1] = self.drone_position[1] - self.set_points[1]
             self.error[2] = self.drone_position[2] - self.set_points[2]
-            global Start
             # if max(list(map(abs,self.error)))<0.8:
             #     print(f"Time taken {Start-time.time()}")
         except IndexError:
@@ -188,9 +290,16 @@ class DroneController():
         
     #------------------------------------------------------------------------------------------------------------------------
 
+        # check if led has been identifed or not and accordingly publish the params
+        if self.led_identified == True:
+            self.led_target(self.current_frame)
+            self.rc_message.rc_roll = self.led_roll
+            self.rc_message.rc_pitch = self.led_pitch
+            self.publish_data_to_rpi(roll=self.rc_message.rc_roll, pitch=self.rc_message.rc_pitch, throttle=self.rc_message.rc_throttle)
 
+        else:
         # self.publish_data_to_rpi( roll = 1500, pitch = 1500, throttle = 1000)
-        self.publish_data_to_rpi(roll=self.rc_message.rc_roll, pitch=self.rc_message.rc_pitch, throttle=self.rc_message.rc_throttle)
+            self.publish_data_to_rpi(roll=self.rc_message.rc_roll, pitch=self.rc_message.rc_pitch, throttle=self.rc_message.rc_throttle)
 
         #Replace the roll pitch and throttle values as calculated by PID 
         
@@ -288,42 +397,112 @@ class DroneController():
 def main(args=None):
     rclpy.init(args=args)
     itr=0
-    points=[[0, 0, 23],
-			[2, 3, 23],
-			[-1, 2, 25],
-			[-3, -3, 25],
-			[0, 0, 27],
-            [0, 0, 29]]
+    landing_itr = 0
+    publish_check = False
+    location = Biolocation()
+    # State 0 implies mapping, state 1 implies moving towards led, state 2 implies landing
+    state = 0 
+    points = []
+    for i in data:
+        data[i][2] = 25
+    points.append(data['E5'])
+    points.append(data['D5'])
+    points.append(data['C5'])
+    points.append(data['B5'])
+    points.append(data['A5'])
+    points.append(data['A4'])
+    points.append(data['A3'])
+    points.append(data['A2'])
+    points.append(data['A1'])
+    points.append(data['B1'])
+    points.append(data['C1'])
+    points.append(data['D1'])
+    points.append(data['E1'])
+    points.append(data['E2'])
+    points.append(data['E3'])
+    points.append(data['E4'])
+    points.append(data['D4'])
+    points.append(data['C4'])
+    points.append(data['B4'])
+    points.append(data['B3'])
+    points.append(data['B2'])
+    points.append(data['C2'])
+    points.append(data['D2'])
+    points.append(data['D3'])
+    points.append(data['C3'])
+
+    file.close()
+    
+    landing = [[-7.235, 5.162, 25],[-7.235, 5.162, 28.5]]
 
     node = rclpy.create_node('controller')
     node.get_logger().info(f"Node Started")
     node.get_logger().info("Entering PID controller loop")
 
     controller = DroneController(node)
-    # controller.arm()
+    controller.arm()
     node.get_logger().info("Armed")
-    global Start
-    Start=time.time()
-    # print(f"Start {time.time()}")
     try:
         while rclpy.ok():
-            if max(list(map(abs,controller.error)))<0.8:
-                if(itr<len(points)):
-                    controller.set_points=points[itr]                    
-                    # controller.integral_error = [0, 0, 0]
+            # if controller.current_frame != None:
+            # print(controller.current_frame.shape)
+            if controller.num_org == 1 and state!=2:
+                state = 2
+                print('To Landing')
+            if state == 0:
+                # print(controller.num_org)
+                if max(list(map(abs,controller.error)))<0.8:
+                    if itr == len(points):
+                        state = 2
+                        print('To Landing')
+
+                    elif(itr<len(points)):
+                        if itr!=0:
+                            # print('check1')
+                            controller.led_detector(controller.current_frame)
+                            if controller.led_identified == True:
+                                state = 1
+                                print('Moving to led')
+                        controller.set_points=points[itr]                    
+                        # controller.integral_error = [0, 0, 0]
+                        itr+=1
                     print(controller.set_points)
-                    itr+=1
-                else :
+                    
+
+            elif state == 1:
+                if controller.led_error != [0, 0] and max([abs(i) for i in controller.led_error]) < 20:
+                    print('Aligned')
+                    controller.led_detector(controller.current_frame)
+                    controller.execution_time = controller.num_led * 2
+                    # print(controller.execution_time)
+                    publish_check = True
+                    controller.led_identified == False
+                    state = 0
+            
+            elif state == 2:
+                if landing_itr<2:
+                    controller.set_points = landing[landing_itr]
+                if landing_itr == 2:
+                    print('Landed')
                     controller.shutdown_hook()
-                    print('Autodisarm')
                     node.destroy_node()
                     rclpy.shutdown()
-            # print('before')
+                elif max(list(map(abs,controller.error)))<0.8:
+                    landing_itr+=1
+
+            if publish_check == True:
+                print('Published')
+                controller.num_org += 1
+                location.organism_type = controller.type_list[0]
+                location.whycon_x = controller.centroid[0]
+                location.whycon_y = controller.centroid[1]
+                location.whycon_z = controller.centroid[2]
+                controller.astrobiolocation.publish(location)
+                publish_check = False
+
             controller.pid()
-            # print('after')
             rclpy.spin_once(node) # Sleep for 1/30 secs
             if controller.drone_position == None:
-            # if (node.get_clock().now().to_msg().sec - controller.last_whycon_pose_received_at > 1) :
                 node.get_logger().error("Unable to detect WHYCON poses")
                 controller.shutdown_hook()
                 node.destroy_node()
@@ -332,8 +511,7 @@ def main(args=None):
 
     except Exception as err:
         print(err)
-    # except:
-    #     pass
+
 
     finally:
         controller.shutdown_hook()

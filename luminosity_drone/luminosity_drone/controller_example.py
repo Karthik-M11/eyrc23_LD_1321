@@ -36,27 +36,24 @@ BASE_THROTTLE = 1470
 MIN_THROTTLE = 1000
 SUM_ERROR_THROTTLE_LIMIT = 20000
 
-Start=0
 
 DRONE_WHYCON_POSE = [[], [], []]
 
 # Similarly, create upper and lower limits, base value, and max sum error values for roll and pitch
 
 class DroneController():
-    def __init__(self,node :Node):
+    def __init__(self,node):
         self.node= node
         
         self.rc_message = RCMessage()
-        self.drone_whycon_pose_array = PoseArray()
+        # self.drone_whycon_pose_array = PoseArray()
+        self.drone_position = [0, 0, 28]
         self.last_whycon_pose_received_at = 0
         self.commandbool = CommandBool.Request()
         service_endpoint = "/swift/cmd/arming"
 
-        self.drone_position = [0,0,28]
-        self.drone_orientation = [0,0,0,0]
-
         self.arming_service_client = self.node.create_client(CommandBool,service_endpoint)
-        self.set_points = [0, 0, 28]         # Setpoints for x, y, z respectively      
+        self.set_points = [0, 0, 0]         # Setpoints for x, y, z respectively      
         
         self.error = [0, 0, 0]         # Error for roll, pitch and throttle        
 
@@ -67,12 +64,12 @@ class DroneController():
         # Create variables for previous error and sum_error
         self.prev_error = [0, 0, 0]
         self.sum_error = [0, 0, 0]
-        # rpy
-        self.Kp = [ 225 * 0.01  , 225 * 0.01  , 300 * 0.01  ] #385 300 #260
- 
+
+        self.Kp = [ 170 * 0.01  , 225 * 0.01  , 300 * 0.01  ]
+
         # Similarly create variables for Kd and Ki
-        self.Ki = [ 90 * 0.0002  , 54 * 0.0002  , 350 * 0.0001  ] #300
-        self.Kd = [ 1050 * 0.1  , 1050 * 0.1  , 1538 * 0.1  ] #1538 #1750
+        self.Ki = [ 85 * 0.0002  , 44 * 0.0002  , 350 * 0.0001  ]
+        self.Kd = [ 1025 * 0.1  , 1000 * 0.1  , 1538 * 0.1  ]
 
         # Create subscriber for WhyCon 
         
@@ -81,8 +78,8 @@ class DroneController():
         # Similarly create subscribers for pid_tuning_altitude, pid_tuning_roll, pid_tuning_pitch and any other subscriber if required
        
         self.pid_alt = node.create_subscription(PidTune,"/pid_tuning_altitude",self.pid_tune_throttle_callback,1)
-        self.pid_roll = node.create_subscription(PidTune, "/pid_tuning_roll", self.pid_tune_roll_callback,1)
-        self.pid_pitch = node.create_subscription(PidTune,"/pid_tuning_pitch",self.pid_tune_pitch_callback,1)
+        self.pid_roll = node.create_subscription(PidTune, "/pid_tuning_pitch", self.pid_tune_roll_callback,1)
+        self.pid_pitch = node.create_subscription(PidTune,"/pid_tuning_altitude",self.pid_tune_pitch_callback,1)
 
         # Create publisher for sending commands to drone 
 
@@ -94,22 +91,13 @@ class DroneController():
 
 
     def whycon_poses_callback(self, msg):
+        self.last_whycon_pose_received_at = self.node.get_clock().now().seconds_nanoseconds()[0]
         self.drone_position[0] = msg.poses[0].position.x
         self.drone_position[1] = msg.poses[0].position.y
-        self.drone_position[2] = msg.poses[0].position.z
-
-        self.drone_orientation[0] = msg.poses[0].orientation.w
-        self.drone_orientation[1] = msg.poses[0].orientation.x
-        self.drone_orientation[2] = msg.poses[0].orientation.y
-        self.drone_orientation[3] = msg.poses[0].orientation.z
-        # print(self.drone_position[0])
-        if(self.drone_position[0] != 1000):
-            self.last_whycon_pose_received_at = self.node.get_clock().now().seconds_nanoseconds()[0]
-
+        self.drone_position[2] = msg.poses[0].position.z        
 
     def pid_tune_throttle_callback(self, msg):
         self.Kp[2] = msg.kp * 0.01
-        # self.Kp[2] = 480 *0.01
         self.Ki[2] = msg.ki * 0.0001
         self.Kd[2] = msg.kd * 0.1
 
@@ -118,7 +106,6 @@ class DroneController():
         self.Kp[0] = msg.kp * 0.01
         self.Ki[0] = msg.ki * 0.0001
         self.Kd[0] = msg.kd * 0.1
-
     
     def pid_tune_pitch_callback(self, msg):
         self.Kp[1] = msg.kp * 0.01
@@ -127,29 +114,22 @@ class DroneController():
 
 
     def pid(self):          # PID algorithm
-        # print('in pid')
+        # print(self.drone_position)
+
         # 0 : calculating Error, Derivative, Integral for Roll error : x axis
         try:
-            self.error[0] = self.drone_position[0] - self.set_points[0] 
+            self.error[0] = self.drone_whycon_pose_array.poses[0].position.x - self.set_points[0] 
         # Similarly calculate error for y and z axes 
-            self.error[1] = self.drone_position[1] - self.set_points[1]
-            self.error[2] = self.drone_position[2] - self.set_points[2]
-            global Start
-            # if max(list(map(abs,self.error)))<0.8:
-            #     print(f"Time taken {Start-time.time()}")
-        except IndexError:
+            self.error[1] = self.drone_whycon_pose_array.poses[0].position.y - self.set_points[1]
+            self.error[2] = self.drone_whycon_pose_array.poses[0].position.z - self.set_points[2]
+        
+        except:
             pass
-        # print(self.error)
+
         # Calculate derivative and intergral errors. Apply anti windup on integral error (You can use your own method for anti windup, an example is shown here)
-        # for i in range(2):
-            # self.integral_error[i] += self.error[i]
-        self.derivative_error[0] = (self.error[0] - self.prev_error[0])
-        self.derivative_error[1] = (self.error[1] - self.prev_error[1])
-        self.derivative_error[2] = (self.error[2] - self.prev_error[2])
-        # self.integral_error[2] += self.error[2]
-        self.integral_error[0] += self.error[0]
-        self.integral_error[1] += self.error[1]
-        self.integral_error[2] += self.error[2]
+        for i in range(3):
+            self.derivative_error[i] = self.error[i] - self.prev_error[i]
+            self.integral_error[i] += self.error[i]
         # self.integral[0] = (self.integral[0] + self.error[0])
         # if self.integral[0] > SUM_ERROR_ROLL_LIMIT:
         #     self.integral[0] = SUM_ERROR_ROLL_LIMIT
@@ -169,15 +149,13 @@ class DroneController():
             self.integral_error[2] = -SUM_ERROR_THROTTLE_LIMIT
 
         # Save current error in previous error
-        self.prev_error[0] = self.error[0]
-        self.prev_error[1] = self.error[1]
-        self.prev_error[2] = self.error[2]
+        for i in range(3):
+            self.prev_error[i] = self.error[i]
 
         # 1 : calculating Error, Derivative, Integral for Pitch error : y axis
         self.out_roll = (self.Kp[0]*self.error[0]) + (self.Ki[0]*self.integral_error[0]) + (self.Kd[0]*self.derivative_error[0])
         self.out_pitch = (self.Kp[1]*self.error[1]) + (self.Ki[1]*self.integral_error[1]) + (self.Kd[1]*self.derivative_error[1])
         self.out_throttle = (self.Kp[2]*self.error[2]) + (self.Ki[2]*self.integral_error[2]) + (self.Kd[2]*self.derivative_error[2])
-
         # 2 : calculating Error, Derivative, Integral for Alt error : z axis
 
 
@@ -189,7 +167,6 @@ class DroneController():
     #------------------------------------------------------------------------------------------------------------------------
 
 
-        # self.publish_data_to_rpi( roll = 1500, pitch = 1500, throttle = 1000)
         self.publish_data_to_rpi(roll=self.rc_message.rc_roll, pitch=self.rc_message.rc_pitch, throttle=self.rc_message.rc_throttle)
 
         #Replace the roll pitch and throttle values as calculated by PID 
@@ -254,9 +231,6 @@ class DroneController():
             self.rc_message.rc_throttle = MAX_THROTTLE
         elif self.rc_message.rc_throttle < MIN_THROTTLE:
             self.rc_message.rc_throttle = MIN_THROTTLE
-        
-
-        # Similarly add bounds for pitch yaw and throttle 
 
         self.rc_pub.publish(self.rc_message)
 
@@ -281,20 +255,14 @@ class DroneController():
 
         # Create the disarm function
         self.node.get_logger().info("Calling disarm service")
-        self.commandbool.value = False
-        self.future = self.arming_service_client.call_async(self.commandbool)
+        while True:
+            self.commandbool.value = False
+            self.future = self.arming_service_client.call_async(self.commandbool)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    itr=0
-    points=[[0, 0, 23],
-			[2, 3, 23],
-			[-1, 2, 25],
-			[-3, -3, 25],
-			[0, 0, 27],
-            [0, 0, 29]]
-
+    check = True
     node = rclpy.create_node('controller')
     node.get_logger().info(f"Node Started")
     node.get_logger().info("Entering PID controller loop")
@@ -302,38 +270,23 @@ def main(args=None):
     controller = DroneController(node)
     # controller.arm()
     node.get_logger().info("Armed")
-    global Start
-    Start=time.time()
-    # print(f"Start {time.time()}")
+
     try:
         while rclpy.ok():
-            if max(list(map(abs,controller.error)))<0.8:
-                if(itr<len(points)):
-                    controller.set_points=points[itr]                    
-                    # controller.integral_error = [0, 0, 0]
-                    print(controller.set_points)
-                    itr+=1
-                else :
-                    controller.shutdown_hook()
-                    print('Autodisarm')
-                    node.destroy_node()
-                    rclpy.shutdown()
-            # print('before')
             controller.pid()
-            # print('after')
-            rclpy.spin_once(node) # Sleep for 1/30 secs
-            if controller.drone_position == None:
-            # if (node.get_clock().now().to_msg().sec - controller.last_whycon_pose_received_at > 1) :
+            if check == True:
+                check = False
+            elif node.get_clock().now().to_msg().sec - controller.last_whycon_pose_received_at > 1:
+                # print(node.get_clock().now().to_msg().sec - controller.last_whycon_pose_received_at)
                 node.get_logger().error("Unable to detect WHYCON poses")
                 controller.shutdown_hook()
                 node.destroy_node()
                 rclpy.shutdown()
+            rclpy.spin_once(node) # Sleep for 1/30 secs
         
 
     except Exception as err:
         print(err)
-    # except:
-    #     pass
 
     finally:
         controller.shutdown_hook()

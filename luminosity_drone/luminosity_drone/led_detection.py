@@ -114,7 +114,7 @@ def identify(num_led):
 		Example call:
 		---
 		identify(2)'''
-    
+    # print('Led number ',num_led)
     if num_led == 2:
         org_type = "alien_a"
     elif num_led == 3:
@@ -160,7 +160,7 @@ def calculate_avg_centroid(organism):
     return [avg_x, avg_y]
 
 
-def led_finder(image, image_name):
+def led_finder(image):
     '''
     Purpose:
     ---
@@ -206,7 +206,7 @@ def led_finder(image, image_name):
     
     # Executed if no circles are identified in the given image
     if circles is None:
-        return [] , []
+        return [] , [], 0
     # Executed if circles are identified in the given image
     else:
         cutoff = 10*circles[0][0][2] # The cutoff distance is 10 times the radius of the first led identified
@@ -232,31 +232,33 @@ def led_finder(image, image_name):
 
         cen_list = []
         type_list = []
+        num_of_led = 0
         for i in org_list:
             # Code to calculate the centroid of the identified organisms and append them to a list.
             avg_cen = calculate_avg_centroid(i)
-            cv2.putText(image, f"{len(i)}", (int(avg_cen[0]), int(avg_cen[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 2)
+            # cv2.putText(image, f"{len(i)}", (int(avg_cen[0]), int(avg_cen[1])), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 2)
             cen_list.append(avg_cen)
 
             # Code to identify the type of the identified organisms and append them to a list.
-            org_type = identify(len(i))
+            num_of_led=len(i)
+            org_type = identify(num_of_led)
             type_list.append(org_type)   
 
-        cv2.imshow(f"{image_name}_result", image)    
-        cv2.imwrite(f"{image_name}_result.png", image)
-        cv2.waitKey(0)     
+        # cv2.imshow(f"{image_name}_result", image)    
+        # cv2.imwrite(f"{image_name}_result.png", image)
+        # cv2.waitKey(0)     
 
-        return type_list, cen_list
+        return type_list, cen_list,num_of_led
 
 
-image_png = args.image # Obtains the image file name from the argument parser
-image = cv2.imread(image_png, 1) # Reads the image
-image_name = image_png.split('.')[0]
-type_list, cen_list = led_finder(image, image_name)
+# image_png = args.image # Obtains the image file name from the argument parser
+# image = cv2.imread(image_png, 1) # Reads the image
+# image_name = image_png.split('.')[0]
+# type_list, cen_list = led_finder(image, image_name)
 
-# Code to create file image_name.txt corresponding to the image_name.png file.
-with open(f"{image_name}.txt", "w") as file:
-        for i in range(len(type_list)):
-            file.write(f"Organism Type: {type_list[i]}\n")
-            file.write(f"Centroid: {cen_list[i]}\n\n")
-file.close()
+# # Code to create file image_name.txt corresponding to the image_name.png file.
+# with open(f"{image_name}.txt", "w") as file:
+#         for i in range(len(type_list)):
+#             file.write(f"Organism Type: {type_list[i]}\n")
+#             file.write(f"Centroid: {cen_list[i]}\n\n")
+# file.close()

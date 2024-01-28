@@ -36,6 +36,7 @@ BASE_THROTTLE = 1470
 MIN_THROTTLE = 1000
 SUM_ERROR_THROTTLE_LIMIT = 20000
 
+Start=0
 
 DRONE_WHYCON_POSE = [[], [], []]
 
@@ -55,7 +56,7 @@ class DroneController():
         self.drone_orientation = [0,0,0,0]
 
         self.arming_service_client = self.node.create_client(CommandBool,service_endpoint)
-        self.set_points = [0, 0, 22]         # Setpoints for x, y, z respectively      
+        self.set_points = [2, 2, 22]         # Setpoints for x, y, z respectively      
         
         self.error = [0, 0, 0]         # Error for roll, pitch and throttle        
 
@@ -66,12 +67,12 @@ class DroneController():
         # Create variables for previous error and sum_error
         self.prev_error = [0, 0, 0]
         self.sum_error = [0, 0, 0]
-
-        self.Kp = [ 170 * 0.01  , 225 * 0.01  , 300 * 0.01  ] #385 300 #260
+        # rpy
+        self.Kp = [ 225 * 0.01  , 225 * 0.01  , 300 * 0.01  ] #385 300 #260
  
         # Similarly create variables for Kd and Ki
-        self.Ki = [ 85 * 0.0002  , 44 * 0.0002  , 350 * 0.0001  ] #300
-        self.Kd = [ 1025 * 0.1  , 1000 * 0.1  , 1538 * 0.1  ] #1538 #1750
+        self.Ki = [ 90 * 0.0002  , 54 * 0.0002  , 350 * 0.0001  ] #300
+        self.Kd = [ 1050 * 0.1  , 1050 * 0.1  , 1538 * 0.1  ] #1538 #1750
 
         # Create subscriber for WhyCon 
         
@@ -126,14 +127,16 @@ class DroneController():
 
 
     def pid(self):          # PID algorithm
-        # print(self.drone_orientation)
+        print('in pid')
         # 0 : calculating Error, Derivative, Integral for Roll error : x axis
         try:
             self.error[0] = self.drone_position[0] - self.set_points[0] 
         # Similarly calculate error for y and z axes 
             self.error[1] = self.drone_position[1] - self.set_points[1]
             self.error[2] = self.drone_position[2] - self.set_points[2]
-
+            global Start
+            if max(list(map(abs,self.error)))<0.8:
+                print(f"Time taken {Start-time.time()}")
         except IndexError:
             pass
         # print(self.error)
@@ -290,8 +293,11 @@ def main(args=None):
     node.get_logger().info("Entering PID controller loop")
 
     controller = DroneController(node)
-    controller.arm()
+    # controller.arm()
     node.get_logger().info("Armed")
+    global Start
+    Start=time.time()
+    print(f"Start {time.time()}")
     try:
         while rclpy.ok():
             controller.pid()

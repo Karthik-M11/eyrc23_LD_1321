@@ -56,7 +56,7 @@ class DroneController():
         self.drone_orientation = [0,0,0,0]
 
         self.arming_service_client = self.node.create_client(CommandBool,service_endpoint)
-        self.set_points = [0, 0, 28]         # Setpoints for x, y, z respectively      
+        self.set_points = [0, 0, 25]         # Setpoints for x, y, z respectively      
         
         self.error = [0, 0, 0]         # Error for roll, pitch and throttle        
 
@@ -67,12 +67,13 @@ class DroneController():
         # Create variables for previous error and sum_error
         self.prev_error = [0, 0, 0]
         self.sum_error = [0, 0, 0]
+        self.change_set = 0
         # rpy
-        self.Kp = [ 225 * 0.01  , 225 * 0.01  , 300 * 0.01  ] #385 300 #260
+        self.Kp = [ 200 * 0.01  , 245 * 0.01  , 100 * 0.01  ] #385 300 #260
  
         # Similarly create variables for Kd and Ki
-        self.Ki = [ 90 * 0.0002  , 54 * 0.0002  , 350 * 0.0001  ] #300
-        self.Kd = [ 1050 * 0.1  , 1050 * 0.1  , 1538 * 0.1  ] #1538 #1750
+        self.Ki = [ 100 * 0.0002  , 38 * 0.0002  , 350 * 0.0001  ] #300
+        self.Kd = [ 1200 * 0.1  , 980 * 0.1  , 1538 * 0.1  ] #1538 #1750
 
         # Create subscriber for WhyCon 
         
@@ -257,7 +258,7 @@ class DroneController():
         
 
         # Similarly add bounds for pitch yaw and throttle 
-
+        # print(self.rc_message.rc_roll, self.rc_message.rc_pitch, self.rc_message.rc_throttle)
         self.rc_pub.publish(self.rc_message)
 
 
@@ -288,19 +289,23 @@ class DroneController():
 def main(args=None):
     rclpy.init(args=args)
     itr=0
-    points=[[0, 0, 23],
-			[2, 3, 23],
-			[-1, 2, 25],
-			[-3, -3, 25],
-			[0, 0, 27],
-            [0, 0, 29]]
+    check_set = 0
+    points=[[0, 0, 25],
+			[2.5, 2.5, 25],
+			[2.5, -2.5, 25],
+			[-2.5, -2.5, 25],
+            [-2.5,2.5,25],
+            [0, 0, 25],
+            [0, 0, 28.5]]
+    currentTime = 0
+    prevTime = 0
 
     node = rclpy.create_node('controller')
     node.get_logger().info(f"Node Started")
     node.get_logger().info("Entering PID controller loop")
 
     controller = DroneController(node)
-    # controller.arm()
+    controller.arm()
     node.get_logger().info("Armed")
     global Start
     Start=time.time()
@@ -308,11 +313,26 @@ def main(args=None):
     try:
         while rclpy.ok():
             if max(list(map(abs,controller.error)))<0.8:
+                # check_set += 1
                 if(itr<len(points)):
-                    controller.set_points=points[itr]                    
+                    if check_set == 0:
+                        prevTime = time.time()
+                        check_set = 1
+                    currentTime = time.time()
+                    # if check_set % 30 == 0:
+                    if currentTime - prevTime > 2:
+                    # if True:
+                        controller.set_points=points[itr]
+                        prevTime = currentTime = 0
+                        check_set = 0
+                        itr += 1
+                    # check_set = 0                    
+                    if(controller.set_points==points[-1]):
+                        global MAX_THROTTLE
+                        MAX_THROTTLE=1450
                     # controller.integral_error = [0, 0, 0]
                     print(controller.set_points)
-                    itr+=1
+                    # itr+=1
                 else :
                     controller.shutdown_hook()
                     print('Autodisarm')

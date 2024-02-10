@@ -7,6 +7,7 @@ Controller for the drone
 # standard imports
 import copy
 import time
+import os
 
 # third-party imports
 import scipy.signal
@@ -59,11 +60,11 @@ class DroneController():
         self.commandbool = CommandBool.Request()
         service_endpoint = "/swift/cmd/arming"
 
-        self.drone_position = [0,0,28]
+        self.drone_position = [-7.105, 6.998, 28.978]
         self.drone_orientation = [0,0,0,0]
 
         self.arming_service_client = self.node.create_client(CommandBool,service_endpoint)
-        self.set_points = [0, 0, 28]         # Setpoints for x, y, z respectively      
+        self.set_points = [0.527, -0.718, 25]         # Setpoints for x, y, z respectively      
         
         self.error = [0, 0, 0]         # Error for roll, pitch and throttle        
 
@@ -75,11 +76,11 @@ class DroneController():
         self.prev_error = [0, 0, 0]
         self.sum_error = [0, 0, 0]
         # rpy
-        self.Kp = [ 225 * 0.01  , 225 * 0.01  , 300 * 0.01  ] #385 300 #260
+        self.Kp = [ 200 * 0.01  , 245 * 0.01  , 100 * 0.01  ] #385 300 #260
  
         # Similarly create variables for Kd and Ki
-        self.Ki = [ 90 * 0.0002  , 54 * 0.0002  , 350 * 0.0001  ] #300
-        self.Kd = [ 1050 * 0.1  , 1050 * 0.1  , 1538 * 0.1  ] #1538 #1750
+        self.Ki = [ 100 * 0.0002  , 38 * 0.0002  , 350 * 0.0001  ] #300
+        self.Kd = [ 1200 * 0.1  , 980 * 0.1  , 1538 * 0.1  ] #1538 #1750
 
         # Define variables to find number of led
         self.num_org = 0
@@ -96,6 +97,8 @@ class DroneController():
         self.cen_list = None
         self.centroid = None
         self.num_led = 0
+
+        self.change_set = 0
 
         # self.itr99=0
         # self.prev99=0
@@ -131,7 +134,7 @@ class DroneController():
 
         # Timer to execute when the buzzer and led needs to be powered.
         self.on_bled = node.create_timer(0.2, self.on_callback)
-        self.off_bled = node.create_timer(0.2, self.off_callback) 
+        self.off_bled = node.create_timer(0.2, self.off_callback)
 
 
     def whycon_poses_callback(self, msg):
@@ -399,6 +402,9 @@ def main(args=None):
     itr=0
     landing_itr = 0
     publish_check = False
+    check_set = 0
+    currentTime = 0
+    prevTime = 0
     location = Biolocation()
     # State 0 implies mapping, state 1 implies moving towards led, state 2 implies landing
     state = 0 
@@ -431,9 +437,18 @@ def main(args=None):
     points.append(data['D3'])
     points.append(data['C3'])
 
+    points.reverse()
+    
+    # points.append(data['C3'])
+    # points.append(data['D4'])
+    # points.append(data['B4'])
+    # points.append(data['B2'])
+    # points.append(data['D2'])
+    # points.append(data['A4'])
+
     file.close()
     
-    landing = [[-7.235, 5.162, 25],[-7.235, 5.162, 28.5]]
+    landing = [points[-1],[points[-1][0],points[-1][1], 28.5]]
 
     node = rclpy.create_node('controller')
     node.get_logger().info(f"Node Started")
@@ -452,6 +467,11 @@ def main(args=None):
             if state == 0:
                 # print(controller.num_org)
                 if max(list(map(abs,controller.error)))<0.8:
+                    if check_set == 0:
+                        prevTime = time.time()
+                        check_set = 1
+                    currentTime = time.time()
+                    # check_set += 1
                     if itr == len(points):
                         state = 2
                         print('To Landing')
@@ -459,14 +479,26 @@ def main(args=None):
                     elif(itr<len(points)):
                         if itr!=0:
                             # print('check1')
-                            controller.led_detector(controller.current_frame)
-                            if controller.led_identified == True:
-                                state = 1
-                                print('Moving to led')
-                        controller.set_points=points[itr]                    
+                            # controller.led_detector(controller.current_frame)
+                            # if controller.led_identified == True:
+                            #     state = 1
+                            #     print('Moving to led')
+                        # if check_set % 30 == 0:
+                        
+                            if currentTime - prevTime > 2:
+                                controller.led_detector(controller.current_frame)
+                                if controller.led_identified == True:
+                                    state = 1
+                                    print('Moving to led')
+                                controller.set_points=points[itr]
+                                prevTime = currentTime = 0
+                                check_set = 0
+                                itr += 1
+                            
+                        # check_set = 0                    
                         # controller.integral_error = [0, 0, 0]
-                        itr+=1
-                    print(controller.set_points)
+                        # itr+=1
+                                print(controller.set_points)
                     
 
             elif state == 1:

@@ -18,7 +18,8 @@ from geometry_msgs.msg import PoseArray
 from pid_msg.msg import PidTune
 from swift_msgs.msg import PIDError, RCMessage
 from swift_msgs.srv import CommandBool
-
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
 
 
 MIN_ROLL = 1250
@@ -67,11 +68,11 @@ class DroneController():
         self.prev_error = [0, 0, 0]
         self.sum_error = [0, 0, 0]
 
-        self.Kp = [ 200 * 0.01  , 245 * 0.01  , 100 * 0.01  ] #385 300 #260
+        self.Kp = [ 180 * 0.01  , 245 * 0.01  , 300 * 0.01  ] #385 300 #260
  
         # Similarly create variables for Kd and Ki
-        self.Ki = [ 100 * 0.0002  , 38 * 0.0002  , 350 * 0.0001  ] #300
-        self.Kd = [ 1200 * 0.1  , 980 * 0.1  , 1538 * 0.1  ] #1538 #1750
+        self.Ki = [ 100 * 0.0002  , 40 * 0.0002  , 350 * 0.0001  ] #300
+        self.Kd = [ 1550 * 0.1  , 980 * 0.1  , 1538 * 0.1  ] #1538 #1750
 
         # Create subscriber for WhyCon 
         
@@ -82,6 +83,8 @@ class DroneController():
         self.pid_alt = node.create_subscription(PidTune,"/pid_tuning_altitude",self.pid_tune_throttle_callback,1)
         self.pid_roll = node.create_subscription(PidTune, "/pid_tuning_pitch", self.pid_tune_roll_callback,1)
         self.pid_pitch = node.create_subscription(PidTune,"/pid_tuning_altitude",self.pid_tune_pitch_callback,1)
+
+        self.camera_sub = node.create_subscription(Image, "/video_frames", self.opencv_callback, 10)
 
         # Create publisher for sending commands to drone 
 
@@ -104,6 +107,14 @@ class DroneController():
         # print(self.drone_position[0])
         if(self.drone_position[0] != 1000):
             self.last_whycon_pose_received_at = self.node.get_clock().now().seconds_nanoseconds()[0]
+
+    def opencv_callback(self, data):
+		# Used to convert between ROS and OpenCV images
+        br = CvBridge()
+		# Convert ROS Image message to OpenCV image
+        self.current_frame = br.imgmsg_to_cv2(data)
+        # cv2.imshow('vaaliban',self.current_frame)
+        # cv2.waitKey(1)
 
 
     def pid_tune_throttle_callback(self, msg):
@@ -291,16 +302,17 @@ def main(args=None):
     node.get_logger().info("Entering PID controller loop")
 
     controller = DroneController(node)
-    controller.arm()
+    # controller.arm()
     node.get_logger().info("Armed")
     try:
         while rclpy.ok():
             controller.pid()
-            # print('hi')
+            print('hi')
             # node.get_logger().info(controller.Kp[0])
             # if node.get_clock().now().to_msg().sec - controller.last_whycon_pose_received_at > 1 :
             #     controller.drone_position = None
             rclpy.spin_once(node) # Sleep for 1/30 secs
+            print('bye')
             # print(node.get_clock().now().to_msg().sec,'now')
             # print(controller.last_whycon_pose_received_at,'last')
             if controller.drone_position == None:

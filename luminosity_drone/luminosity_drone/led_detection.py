@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 '''
 # Team ID:           1321
 # Theme:             Luminosity Drone
@@ -160,7 +162,7 @@ def calculate_avg_centroid(organism):
     return [avg_x, avg_y]
 
 
-def led_finder(image):
+def led_finder(image, image_name):
     '''
     Purpose:
     ---
@@ -245,7 +247,7 @@ def led_finder(image):
             type_list.append(org_type)   
 
         # cv2.imshow(f"{image_name}_result", image)    
-        # cv2.imwrite(f"{image_name}_result.png", image)
+        cv2.imwrite(f"{str(image_name)}_result.png", image)
         # cv2.waitKey(0)     
 
         return type_list, cen_list,num_of_led
@@ -254,7 +256,7 @@ def led_finder(image):
 # image_png = args.image # Obtains the image file name from the argument parser
 # image = cv2.imread(image_png, 1) # Reads the image
 # image_name = image_png.split('.')[0]
-# type_list, cen_list = led_finder(image, image_name)
+# type_list, cen_list, fhdjuf = led_finder(image)
 
 # # Code to create file image_name.txt corresponding to the image_name.png file.
 # with open(f"{image_name}.txt", "w") as file:

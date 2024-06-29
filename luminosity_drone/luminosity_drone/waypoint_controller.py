@@ -69,11 +69,11 @@ class DroneController():
         self.sum_error = [0, 0, 0]
         self.change_set = 0
         # rpy
-        self.Kp = [ 200 * 0.01  , 245 * 0.01  , 100 * 0.01  ] #385 300 #260
+        self.Kp = [ 225 * 0.01  , 245 * 0.01  , 300 * 0.01  ] #385 300 #260
  
         # Similarly create variables for Kd and Ki
         self.Ki = [ 100 * 0.0002  , 38 * 0.0002  , 350 * 0.0001  ] #300
-        self.Kd = [ 1200 * 0.1  , 980 * 0.1  , 1538 * 0.1  ] #1538 #1750
+        self.Kd = [ 1296 * 0.1  , 980 * 0.1  , 1538 * 0.1  ] #1538 #1750
 
         # Create subscriber for WhyCon 
         

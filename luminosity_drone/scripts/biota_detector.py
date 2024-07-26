@@ -380,7 +380,7 @@ if __name__ == '__main__':
 	led_detected = 0
 	
 	# Update the path with the path to setpoints.txt
-	with open(r'/home/karthik/eyantra_ws/src/luminosity_drone/luminosity_drone/scripts/setpoints.txt', 'r') as file:
+	with open(r'setpoints.txt', 'r') as file:
 		content = file.read()
 	points = ast.literal_eval(content)
 
